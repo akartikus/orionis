@@ -40,10 +40,11 @@ async def scheduled_portfolio_sync() -> None:
 
 
 async def scheduled_market_sync() -> None:
-    """Task: Periodic synchronization of market indicators (BTC, ETH, SOL)."""
+    """Task: Periodic synchronization of market indicators."""
     try:
-        logger.info("⏰ [Scheduled Task] Starting market data synchronization...")
-        await run_market_sync(assets=["BTC", "ETH", "SOL"])
+        assets = settings.market_assets_list
+        logger.info(f"⏰ [Scheduled Task] Starting market data synchronization for {assets}...")
+        await run_market_sync(assets=assets)
     except Exception as e:
         logger.error(f"❌ [Scheduled Task Error] Market sync failed: {e}")
 
@@ -66,9 +67,31 @@ async def lifespan(app: FastAPI):
     await db.connect()
 
     # Configure background schedules
-    scheduler.add_job(scheduled_portfolio_sync, "interval", minutes=5, id="portfolio_sync")
-    scheduler.add_job(scheduled_market_sync, "interval", minutes=1, id="market_sync")
-    scheduler.add_job(scheduled_news_sync, "interval", minutes=15, id="news_sync")
+    scheduler.add_job(
+        scheduled_portfolio_sync,
+        "interval",
+        minutes=settings.SCHEDULER_PORTFOLIO_INTERVAL_MINUTES,
+        id="portfolio_sync",
+    )
+    scheduler.add_job(
+        scheduled_market_sync,
+        "interval",
+        minutes=settings.SCHEDULER_MARKET_INTERVAL_MINUTES,
+        id="market_sync",
+    )
+    scheduler.add_job(
+        scheduled_news_sync,
+        "interval",
+        minutes=settings.SCHEDULER_NEWS_INTERVAL_MINUTES,
+        id="news_sync",
+    )
+
+    logger.info(
+        "📋 Scheduler configuré — portfolio: %d min, market: %d min, news: %d min",
+        settings.SCHEDULER_PORTFOLIO_INTERVAL_MINUTES,
+        settings.SCHEDULER_MARKET_INTERVAL_MINUTES,
+        settings.SCHEDULER_NEWS_INTERVAL_MINUTES,
+    )
     
     scheduler.start()
     logger.info("⏱️ APScheduler started with active background jobs.")
@@ -148,7 +171,7 @@ async def trigger_market_sync(
     assets: Optional[List[str]] = None,
 ) -> Dict[str, str]:
     """Manually trigger an asynchronous market data sync."""
-    target_assets = assets or ["BTC", "ETH", "SOL"]
+    target_assets = assets or settings.market_assets_list
     background_tasks.add_task(run_market_sync, target_assets)
     return {"message": f"Market sync triggered for assets: {target_assets}"}
 

@@ -48,6 +48,14 @@ DISCORD_GUILD_ID=identifiant_du_serveur_discord
 
 # LLM (optionnel)
 OPENROUTER_API=votre_cle_openrouter
+
+# Scheduler — intervalles en minutes (optionnel, valeurs par défaut indiquées)
+SCHEDULER_PORTFOLIO_INTERVAL_MINUTES=5
+SCHEDULER_MARKET_INTERVAL_MINUTES=1
+SCHEDULER_NEWS_INTERVAL_MINUTES=15
+
+# Assets surveillés par le market sync (optionnel, comma-separated)
+MARKET_SYNC_ASSETS=BTC,ETH,SOL
 ```
 
 ### Où trouver chaque valeur

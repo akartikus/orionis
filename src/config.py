@@ -21,7 +21,20 @@ class Settings(BaseSettings):
     # LLM
     OPENROUTER_API: str | None = None
 
+    # Scheduler (APScheduler) — intervalles en minutes
+    SCHEDULER_PORTFOLIO_INTERVAL_MINUTES: int = 5
+    SCHEDULER_MARKET_INTERVAL_MINUTES: int = 1
+    SCHEDULER_NEWS_INTERVAL_MINUTES: int = 15
+
+    # Assets surveillés par le market sync (comma-separated)
+    MARKET_SYNC_ASSETS: str = "BTC,ETH,SOL"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+    @property
+    def market_assets_list(self) -> list[str]:
+        """Parse la chaîne ``MARKET_SYNC_ASSETS`` en liste d'assets."""
+        return [asset.strip() for asset in self.MARKET_SYNC_ASSETS.split(",") if asset.strip()]
 
 
 settings = Settings()
