@@ -26,11 +26,31 @@ class SupabaseDatabase:
         return self._client
 
     async def disconnect(self) -> None:
-        if self._client is not None:
-            logger.info("Closing Supabase connection...")
-            # Supabase utilise un client httpx interne qui gère sa propre fermeture
-            self._client = None
-            logger.info("Connection Supabase closed.")
+        if self._client is None:
+            return
+        client = self._client
+        logger.info("Closing Supabase connection...")
+        # Le client Supabase de haut niveau n'expose pas de méthode de
+        # fermeture unique ; on ferme proprement chaque sous-client async.
+        # `auth` et `realtime` sont toujours créés à l'initialisation ;
+        # `postgrest`, `storage` et `functions` sont paresseux (on n'accède
+        # qu'à l'attribut privé pour ne pas déclencher leur création).
+        closers = (
+            ("auth", getattr(client.auth, "close", None)),
+            ("realtime", getattr(client.realtime, "close", None)),
+            ("postgrest", getattr(getattr(client, "_postgrest", None), "aclose", None)),
+            ("storage", getattr(getattr(client, "_storage", None), "aclose", None)),
+            ("functions", getattr(getattr(client, "_functions", None), "aclose", None)),
+        )
+        for name, closer in closers:
+            if closer is None:
+                continue
+            try:
+                await closer()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"Error while closing Supabase {name} client: {exc}")
+        self._client = None
+        logger.info("Connection Supabase closed.")
 
     @property
     def client(self) -> AsyncClient:
@@ -47,8 +67,10 @@ db = SupabaseDatabase()
 
 
 async def get_db_client() -> AsyncGenerator[AsyncClient, None]:
+    """Dépendance FastAPI : fournit le client Supabase partagé.
+
+    Le client étant un singleton global, on ne le ferme pas après chaque
+    requête ; la fermeture se fait via ``await db.disconnect()`` à l'arrêt.
+    """
     client = await db.connect()
-    try:
-        yield client
-    finally:
-        pass
+    yield client

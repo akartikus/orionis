@@ -1,6 +1,10 @@
+import asyncio
+import logging
 import sys
 from pydantic import ValidationError
+
 from config import settings
+from database.client import db
 
 
 def check_configuration() -> None:
@@ -42,7 +46,46 @@ def check_configuration() -> None:
     print("\n🚀 Le socle de configuration de la Phase 0 est prêt !")
 
 
+async def test_database_connection() -> bool:
+    """Teste la connexion à la base de données Supabase.
+
+    Effectue un véritable appel réseau (liste des buckets Storage) afin de
+    valider la connectivité au endpoint Supabase et l'authentification via la
+    clé configurée. Retourne ``True`` en cas de succès, ``False`` sinon.
+    """
+    print("\n🔌 Test de la connexion à Supabase...")
+
+    try:
+        client = await db.connect()
+    except Exception as exc:  # noqa: BLE001
+        print(f"  ❌ Échec de l'initialisation du client Supabase : {exc}")
+        return False
+
+    try:
+        # Appel réseau réel : liste des buckets Storage.
+        # Ne dépend pas d'une table spécifique et valide la clé (service_role).
+        buckets = await client.storage.list_buckets()
+        print(
+            f"  ✅ Connexion Supabase établie — "
+            f"{len(buckets)} bucket(s) Storage accessible(s)."
+        )
+        for bucket in buckets:
+            print(f"     • {bucket.name}")
+        return True
+    except Exception as exc:  # noqa: BLE001
+        print(f"  ❌ Échec de la requête Supabase : {exc}")
+        return False
+    finally:
+        await db.disconnect()
+
+
 if __name__ == "__main__":
+    # Configuration du logging pour afficher les logs du module database.client
+    logging.basicConfig(
+        level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    )
+
     try:
         check_configuration()
     except ValidationError as e:
@@ -51,3 +94,10 @@ if __name__ == "__main__":
             field = " -> ".join(str(loc) for loc in error["loc"])
             print(f"  • Champ manquant ou invalide : [{field}] — {error['msg']}", file=sys.stderr)
         sys.exit(1)
+
+    connection_ok = asyncio.run(test_database_connection())
+    if not connection_ok:
+        print("\n❌ Le test de connexion à la base de données a échoué.", file=sys.stderr)
+        sys.exit(1)
+
+    print("\n🚀 Le socle de configuration et de base de données est prêt !")
