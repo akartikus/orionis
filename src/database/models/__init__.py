@@ -32,6 +32,13 @@ from database.models.market import (
     MarketSnapshotResponse,
 )
 
+from database.models.news import (
+    NewsBase, 
+    NewsCreate, 
+    NewsResponse, 
+    SentimentLabel
+)
+
 __all__ = [
     "PortfolioBase",
     "PortfolioCreate",
