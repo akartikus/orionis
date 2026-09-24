@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    APP_NAME: str = "ORIONIS"
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "INFO"
 
