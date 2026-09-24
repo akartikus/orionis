@@ -6,3 +6,4 @@ httpx>=0.25.0
 ccxt>=4.0.0
 feedparser>=6.0.0
 ruff
+discord.py
