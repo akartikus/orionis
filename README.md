@@ -79,6 +79,12 @@ Le schéma SQL est versionné dans `src/database/schema/`. Avant le premier lanc
 | `001_initial_orionis_schema.sql` | `portfolio`, `bot_managed_assets`, `transactions`, `orders`, `decisions`, `market_snapshots` |
 | `002_add_news_table.sql` | `news` |
 | `003_add_transactions_table.sql` | `transactions_log` (journal des ordres exécutés par le bot) |
+| `004_add_macro_data_table.sql` | `macro_indicators` (indicateurs macroéconomiques horodatés) |
+| `005_add_onchain_data_table.sql` | `onchain_data` (métriques on-chain par actif) |
+| `006_add_strategy_config_table.sql` | `strategy_config` (paramètres de stratégie + ligne initiale conservative) |
+| `007_add_alerts_table.sql` | `alerts` (événements détectés : prix, news, seuils) |
+| `008_add_ai_reports_table.sql` | `ai_reports` (rapports structurés des analystes IA) |
+| `009_add_orchestration_logs_table.sql` | `orchestration_logs` (trace des workflows exécutés) |
 
 > Les migrations activent **Row Level Security (RLS)** sur toutes les tables. La `SUPABASE_KEY` utilisée côté serveur doit avoir les droits suffisants (clé `service_role` pour l'écriture).
 
@@ -105,11 +111,17 @@ orionis/
     │   └── order_executor.py     # Exécution d'ordres live Bitvavo (CCXT) + log Supabase
     ├── database/
     │   ├── client.py             # Client Supabase partagé (singleton)
-    │   ├── models/               # Modèles Pydantic (portfolio, orders, news, etc.)
+    │   ├── models/               # Modèles Pydantic (portfolio, orders, news, macro, alerts, etc.)
     │   └── schema/               # Migrations SQL (PostgreSQL/Supabase)
     │       ├── 001_initial_orionis_schema.sql
     │       ├── 002_add_news_table.sql
-    │       └── 003_add_transactions_table.sql
+    │       ├── 003_add_transactions_table.sql
+    │       ├── 004_add_macro_data_table.sql
+    │       ├── 005_add_onchain_data_table.sql
+    │       ├── 006_add_strategy_config_table.sql
+    │       ├── 007_add_alerts_table.sql
+    │       ├── 008_add_ai_reports_table.sql
+    │       └── 009_add_orchestration_logs_table.sql
     └── scripts/
         ├── run_bot.py            # Point d'entrée du bot Discord
         └── test_market_sync.py   # Test du MarketCollector
@@ -169,4 +181,4 @@ Commandes slash disponibles dans Discord :
 
 - **Discord** : le bot doit être invité dans le serveur avec les scopes `bot` **et** `applications.commands` pour que les commandes slash fonctionnent.
 - **Discord** : activer le mode développeur (Paramètres → Avancé) pour copier l'identifiant du serveur (`DISCORD_GUILD_ID`).
-- **Supabase** : le schéma doit être initialisé avant le premier lancement — exécute les migrations SQL de `src/database/schema/` (voir [Base de données (Supabase)](#base-de-données-supabase)). Tables concernées : `portfolio`, `bot_managed_assets`, `transactions`, `orders`, `decisions`, `market_snapshots`, `news`, `transactions_log`.
+- **Supabase** : le schéma doit être initialisé avant le premier lancement — exécute les migrations SQL de `src/database/schema/` (voir [Base de données (Supabase)](#base-de-données-supabase)). Tables concernées : `portfolio`, `bot_managed_assets`, `transactions`, `orders`, `decisions`, `market_snapshots`, `news`, `transactions_log`, `macro_indicators`, `onchain_data`, `strategy_config`, `alerts`, `ai_reports`, `orchestration_logs`.

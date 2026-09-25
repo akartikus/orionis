@@ -51,7 +51,7 @@ Orionis est un système complet en 7 couches :
 |---|---|---|---|
 | 00 | `etape-00-audit-corrections.md` | Audit & corrections de l'existant | 🔴 Critique |
 | 01 | `etape-01-database-migrations.md` | Migrations DB complémentaires | 🔴 Critique |
-| 02 | `etape-02-orionis-core.md` | Orionis Core — Orchestrateur central | 🔴 Critique |
+| 02 | `etape-02-jarvis-core.md` | Jarvis Core — Orchestrateur central | 🔴 Critique |
 | 03 | `etape-03-llm-provider.md` | LLM Provider — Abstraction IA interchangeable | 🔴 Critique |
 | 04 | `etape-04-data-collection.md` | Data Collection Layer complet | 🟠 Élevée |
 | 05 | `etape-05-ai-analysis.md` | AI Analysis Layer (3 analystes + synthèse) | 🔴 Critique |
@@ -84,42 +84,3 @@ de 02/03 car les collectors sont indépendants de l'orchestrateur.
 - **Config** : `src/config.py` (Pydantic Settings, `.env`)
 - **Pas de sync blocking** dans l'event loop
 - Typage statique complet (`pyright` configuré dans `pyproject.toml`)
-
----
-
-## Convention de migration base de données
-
-> **Règle** : Toute modification du schéma PostgreSQL/Supabase (ajout,
-> modification ou suppression de table, colonne, index, contrainte) doit
-> faire l'objet d'un **nouveau fichier de migration** dans
-> `src/database/schema/`, numéroté séquentiellement (`NNN_description.sql`).
-
-### Principes
-
-1. **Une migration = un fichier** : `NNN_description.sql` (ex: `004_add_macro_data_table.sql`)
-2. **Numérotation strictement croissante** : les migrations s'exécutent dans l'ordre
-3. **Jamais de modification d'une migration déjà appliquée** : si un schéma
-   doit évoluer, créer une nouvelle migration (ex: `011_alter_bot_managed_assets.sql`)
-4. **Idempotence** : chaque migration utilise `CREATE TABLE IF NOT EXISTS`,
-   `ADD COLUMN IF NOT EXISTS`, etc. pour pouvoir être rejouée sans erreur
-5. **Sécurité** : `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` sur chaque
-   nouvelle table
-6. **Documentation** : chaque fichier contient un commentaire en haut
-   expliquant son objectif
-7. **README** : le `README.md` du projet liste toutes les migrations dans
-   l'ordre d'exécution
-
-### Ordre d'exécution
-
-Les migrations s'appliquent dans l'éditeur SQL de Supabase (Dashboard →
-SQL Editor), **dans l'ordre numérique**. Le tableau de suivi est dans le
-`README.md` à la rubrique « Base de données (Supabase) ».
-
-### Étapes concernées
-
-| Étape | Migrations | Détail |
-|---|---|---|
-| 00 | Aucune | Corrections de code uniquement (schéma correct) |
-| 01 | `004` → `009` | 6 nouvelles tables |
-| 07 | `010` | Lien `decisions` ↔ `orders` |
-| Autres | Selon besoin | Créer un fichier si le schéma évolue |
