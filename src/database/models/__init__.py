@@ -11,6 +11,11 @@ from database.models.transaction import (
     TransactionBase,
     TransactionCreate,
     TransactionResponse,
+    OrderSide, 
+    OrderType, 
+    TransactionLogCreate, 
+    TransactionLogResponse,
+    TradeRequest
 )
 from database.models.order import (
     OrderSide,

@@ -18,6 +18,9 @@ from collectors.news_collector import run_news_sync
 from collectors.portfolio_collector import run_portfolio_sync
 from config import settings
 from database.client import db
+from database.models.transaction import TradeRequest
+
+from execution.order_executor import order_executor
 
 # Configure logging
 logging.basicConfig(
@@ -155,6 +158,22 @@ async def get_portfolio(managed_only: bool = False) -> Dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve portfolio state.",
+        )
+
+@app.post("/api/v1/trade", tags=["Execution"])
+async def execute_trade(request: TradeRequest) -> Dict[str, Any]:
+    """Execute a live trade on Bitvavo and tag origin='ORIONIS' in Supabase."""
+    try:
+        result = await order_executor.execute_market_order(
+            symbol=request.symbol,
+            side=request.side,
+            amount=request.amount,
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Trade execution failed: {str(e)}",
         )
 
 

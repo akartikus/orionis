@@ -34,6 +34,9 @@ Créer un fichier `.env` à la racine du projet :
 ENVIRONMENT=development
 LOG_LEVEL=INFO
 
+# API FastAPI (interrogée par le bot Discord ; par défaut http://127.0.0.1:8000)
+FASTAPI_BASE_URL=http://127.0.0.1:8000
+
 # Supabase
 SUPABASE_URL=https://xxxxx.supabase.co
 SUPABASE_KEY=votre_cle_supabase
@@ -67,6 +70,18 @@ MARKET_SYNC_ASSETS=BTC,ETH,SOL
 | `DISCORD_BOT_TOKEN` | Discord Developer Portal → votre application → Bot → Token |
 | `DISCORD_GUILD_ID` | Discord (mode développeur activé) → clic droit sur le serveur → « Copier l'identifiant » |
 
+## Base de données (Supabase)
+
+Le schéma SQL est versionné dans `src/database/schema/`. Avant le premier lancement, exécute les migrations **dans l'ordre** dans l'éditeur SQL de Supabase (Dashboard → SQL Editor) :
+
+| Fichier | Tables créées |
+|---|---|
+| `001_initial_orionis_schema.sql` | `portfolio`, `bot_managed_assets`, `transactions`, `orders`, `decisions`, `market_snapshots` |
+| `002_add_news_table.sql` | `news` |
+| `003_add_transactions_table.sql` | `transactions_log` (journal des ordres exécutés par le bot) |
+
+> Les migrations activent **Row Level Security (RLS)** sur toutes les tables. La `SUPABASE_KEY` utilisée côté serveur doit avoir les droits suffisants (clé `service_role` pour l'écriture).
+
 ## Structure du projet
 
 ```
@@ -80,14 +95,21 @@ orionis/
     ├── bot/
     │   ├── client.py             # Factory du bot Discord (create_bot)
     │   └── commands/
-    │       └── portfolio.py      # Commande /portfolio (lecture Supabase)
+    │       ├── portfolio.py      # Commande /portfolio (interroge l'API FastAPI)
+    │       └── trade.py          # Commande /trade (ordre au marché via l'API FastAPI)
     ├── collectors/
     │   ├── portfolio_collector.py  # Sync Bitvavo → table 'portfolio'
     │   ├── market_collector.py     # Snapshots de marché + indicateurs (RSI, MACD, EMA)
     │   └── news_collector.py      # Collecte RSS + analyse de sentiment
+    ├── execution/
+    │   └── order_executor.py     # Exécution d'ordres live Bitvavo (CCXT) + log Supabase
     ├── database/
-    │   ├── client.py              # Client Supabase partagé (singleton)
-    │   └── models/               # Modèles Pydantic (portfolio, orders, news, etc.)
+    │   ├── client.py             # Client Supabase partagé (singleton)
+    │   ├── models/               # Modèles Pydantic (portfolio, orders, news, etc.)
+    │   └── schema/               # Migrations SQL (PostgreSQL/Supabase)
+    │       ├── 001_initial_orionis_schema.sql
+    │       ├── 002_add_news_table.sql
+    │       └── 003_add_transactions_table.sql
     └── scripts/
         ├── run_bot.py            # Point d'entrée du bot Discord
         └── test_market_sync.py   # Test du MarketCollector
@@ -109,6 +131,7 @@ Endpoints disponibles :
 |---|---|---|
 | `GET` | `/health` | Vérifie que l'API et le scheduler sont en ligne |
 | `GET` | `/api/v1/portfolio?managed_only=false` | Liste le portefeuille global Supabase |
+| `POST` | `/api/v1/trade` | Exécute un ordre au marché sur Bitvavo (origin='ORIONIS') |
 | `POST` | `/api/v1/sync/portfolio` | Sync manuelle du portefeuille depuis Bitvavo |
 | `POST` | `/api/v1/sync/market` | Sync manuelle des données de marché |
 | `POST` | `/api/v1/sync/news` | Sync manuelle des actualités crypto |
@@ -120,6 +143,8 @@ Jobs planifiés (APScheduler) :
 
 ### Bot Discord
 
+> ⚠️ **Prérequis** : le serveur FastAPI doit être démarré **avant** le bot. La commande `/portfolio` interroge l'API (`GET /api/v1/portfolio`) via `FASTAPI_BASE_URL` et ne lit plus Supabase directement.
+
 ```bash
 .venv/bin/python src/scripts/run_bot.py
 ```
@@ -129,8 +154,9 @@ Commandes slash disponibles dans Discord :
 | Commande | Description |
 |---|---|
 | `/portfolio` | Affiche le portefeuille global + positions Orionis (boutons de bascule) |
+| `/trade` | Passe un ordre au marché sur Bitvavo (achat/vente, avec confirmation boutons) |
 
-> **Données affichées** : `/portfolio` lit les données **déjà synchronisées** dans Supabase. Pour rafraîchir, utilisez l'endpoint `POST /api/v1/sync/portfolio` ou attendez le job planifié.
+> **Données affichées** : `/portfolio` interroge l'API FastAPI, qui renvoie les données **déjà synchronisées** dans Supabase. Pour rafraîchir, utilisez l'endpoint `POST /api/v1/sync/portfolio` ou attendez le job planifié.
 
 ### Test des collectors (sans API ni bot)
 
@@ -143,4 +169,4 @@ Commandes slash disponibles dans Discord :
 
 - **Discord** : le bot doit être invité dans le serveur avec les scopes `bot` **et** `applications.commands` pour que les commandes slash fonctionnent.
 - **Discord** : activer le mode développeur (Paramètres → Avancé) pour copier l'identifiant du serveur (`DISCORD_GUILD_ID`).
-- **Supabase** : les tables `portfolio`, `bot_managed_assets`, `market_snapshots`, `news` doivent exister avant le premier lancement.
+- **Supabase** : le schéma doit être initialisé avant le premier lancement — exécute les migrations SQL de `src/database/schema/` (voir [Base de données (Supabase)](#base-de-données-supabase)). Tables concernées : `portfolio`, `bot_managed_assets`, `transactions`, `orders`, `decisions`, `market_snapshots`, `news`, `transactions_log`.

@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     # LLM
     OPENROUTER_API: str | None = None
 
+    FASTAPI_BASE_URL: str = "http://127.0.0.1:8000"
+
     # Scheduler (APScheduler) — intervalles en minutes
     SCHEDULER_PORTFOLIO_INTERVAL_MINUTES: int = 5
     SCHEDULER_MARKET_INTERVAL_MINUTES: int = 1

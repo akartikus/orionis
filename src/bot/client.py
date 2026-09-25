@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 # Cogs à charger automatiquement au démarrage du bot.
 INITIAL_EXTENSIONS: tuple[str, ...] = (
     "bot.commands.portfolio",
+    "bot.commands.trade",
 )
 
 
