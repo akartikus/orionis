@@ -113,8 +113,10 @@ async def fetch_portfolio_embed(managed_only: bool = False) -> discord.Embed:
             lines = []
             for item in items:
                 asset = item["asset"]
-                qty = float(item["quantity"])
-                buy_price = float(item["avg_buy_price"])
+                qty = float(item["allocated_quantity"])
+                total_invested = float(item["total_invested_eur"])
+                # PRU (Prix de Revient Unitaire) calculé depuis le schéma réel
+                buy_price = total_invested / qty if qty > 0 else 0.0
                 current_price = float(item.get("current_price") or buy_price)
                 val = qty * current_price
                 total_val += val

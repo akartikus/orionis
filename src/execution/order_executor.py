@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, cast
 import ccxt.async_support as ccxt
 from config import settings
 from database.client import db
@@ -50,7 +50,7 @@ class OrderExecutor:
             order = await exchange.create_order(
                 symbol=symbol,
                 type="market",
-                side=side,
+                side=cast(Any, side),
                 amount=amount,
             )
             
@@ -129,46 +129,56 @@ class OrderExecutor:
         amount: float,
         price: float,
     ) -> None:
-        """Update or delete entries in 'bot_managed_assets' based on execution."""
+        """Update or delete entries in 'bot_managed_assets' based on execution.
+
+        Aligné sur le schéma réel de la table ``bot_managed_assets`` :
+        - ``allocated_quantity`` (et non ``quantity``)
+        - ``total_invested_eur`` (et non ``avg_buy_price``)
+        - pas de colonne ``origin`` sur cette table
+        """
         client = await db.connect()
-        
+
         # Check if asset already exists in bot_managed_assets
         res = await client.table("bot_managed_assets").select("*").eq("asset", asset).execute()
-        existing = res.data[0] if res.data else None
+        existing: dict[str, Any] | None = cast(dict[str, Any], res.data[0]) if res.data else None
 
         if side == "buy":
             if existing:
-                old_qty = float(existing["quantity"])
-                old_avg_price = float(existing["avg_buy_price"])
+                old_qty = float(existing["allocated_quantity"])
+                old_total_invested = float(existing["total_invested_eur"])
                 new_qty = old_qty + amount
-                new_avg_price = ((old_qty * old_avg_price) + (amount * price)) / new_qty
-                
+                new_total_invested = old_total_invested + (amount * price)
+
                 await client.table("bot_managed_assets").update({
-                    "quantity": new_qty,
-                    "avg_buy_price": new_avg_price,
-                    "current_price": price,
+                    "allocated_quantity": str(new_qty),
+                    "total_invested_eur": str(new_total_invested),
+                    "current_price": str(price),
                 }).eq("asset", asset).execute()
             else:
                 await client.table("bot_managed_assets").insert({
                     "asset": asset,
-                    "quantity": amount,
-                    "avg_buy_price": price,
-                    "current_price": price,
-                    "origin": "ORIONIS",
+                    "allocated_quantity": str(amount),
+                    "total_invested_eur": str(amount * price),
+                    "current_price": str(price),
                 }).execute()
 
         elif side == "sell":
             if existing:
-                old_qty = float(existing["quantity"])
+                old_qty = float(existing["allocated_quantity"])
+                old_total_invested = float(existing["total_invested_eur"])
                 new_qty = old_qty - amount
-                
+
                 if new_qty <= 1e-6:  # Position fully closed
                     await client.table("bot_managed_assets").delete().eq("asset", asset).execute()
                     logger.info(f"🗑️ Closed position for {asset} in bot_managed_assets.")
                 else:
+                    # Réduction proportionnelle du total investi
+                    new_total_invested = old_total_invested * (new_qty / old_qty) if old_qty > 0 else 0.0
+
                     await client.table("bot_managed_assets").update({
-                        "quantity": new_qty,
-                        "current_price": price,
+                        "allocated_quantity": str(new_qty),
+                        "total_invested_eur": str(new_total_invested),
+                        "current_price": str(price),
                     }).eq("asset", asset).execute()
 
 
