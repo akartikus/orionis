@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     # Assets surveillés par le market sync (comma-separated)
     MARKET_SYNC_ASSETS: str = "BTC,ETH,SOL"
 
+    # Orionis Core — configuration du workflow quotidien et des seuils d'alerte
+    DAILY_ANALYSIS_HOUR: int = 8
+    DAILY_ANALYSIS_MINUTE: int = 0
+    PRICE_DROP_THRESHOLD_PCT: float = 8.0
+    PRICE_SURGE_THRESHOLD_PCT: float = 8.0
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @property

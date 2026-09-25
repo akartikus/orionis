@@ -10,13 +10,16 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from fastapi import BackgroundTasks, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 from collectors.market_collector import run_market_sync
 from collectors.news_collector import run_news_sync
 from collectors.portfolio_collector import run_portfolio_sync
 from config import settings
+from core.orionis_core import orionis_core
 from database.client import db
 from database.models.transaction import TradeRequest
 
@@ -99,9 +102,29 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     logger.info("⏱️ APScheduler started with active background jobs.")
 
+    # Job quotidien — analyse complète via Orionis Core (cron 08h00)
+    scheduler.add_job(
+        orionis_core.run_daily_analysis,
+        CronTrigger(
+            hour=settings.DAILY_ANALYSIS_HOUR,
+            minute=settings.DAILY_ANALYSIS_MINUTE,
+        ),
+        id="daily_analysis",
+        replace_existing=True,
+    )
+    logger.info(
+        "📋 Daily analysis job scheduled at %02d:%02d.",
+        settings.DAILY_ANALYSIS_HOUR,
+        settings.DAILY_ANALYSIS_MINUTE,
+    )
+
+    # Démarrer Orionis Core (EventBus + WorkflowEngine)
+    await orionis_core.start()
+
     yield  # Application runs here
 
     logger.info("🛑 Shutting down ORIONIS application...")
+    await orionis_core.stop()
     scheduler.shutdown(wait=False)
 
 
@@ -133,6 +156,7 @@ async def health_check() -> Dict[str, Any]:
         "status": "online",
         "app_name": settings.APP_NAME,
         "scheduler_running": scheduler.running,
+        "orionis_core_status": orionis_core.status,
     }
 
 
@@ -200,3 +224,71 @@ async def trigger_news_sync(background_tasks: BackgroundTasks) -> Dict[str, str]
     """Manually trigger an asynchronous news & sentiment sync."""
     background_tasks.add_task(run_news_sync)
     return {"message": "News synchronization triggered in background."}
+
+
+# ====================================================================
+# ORIONIS CORE — Workflows & Orchestration
+# ====================================================================
+
+
+class UrgentAnalysisRequest(BaseModel):
+    """Request body for triggering an urgent analysis workflow."""
+
+    asset: str = Field(..., examples=["BTC"], description="Asset ticker to analyze")
+    reason: str = Field(default="Manual trigger", description="Reason for the urgent analysis")
+
+
+@app.post("/api/v1/orionis/daily-analysis", tags=["Orionis Core"])
+async def trigger_daily_analysis(
+    background_tasks: BackgroundTasks,
+) -> Dict[str, str]:
+    """Manually trigger the daily analysis workflow in background."""
+    background_tasks.add_task(orionis_core.run_daily_analysis)
+    return {"message": "Daily analysis workflow triggered in background."}
+
+
+@app.post("/api/v1/orionis/urgent-analysis", tags=["Orionis Core"])
+async def trigger_urgent_analysis(
+    request: UrgentAnalysisRequest,
+) -> Dict[str, Any]:
+    """Trigger an urgent analysis workflow for a specific asset."""
+    try:
+        result = await orionis_core.run_urgent_analysis(
+            asset=request.asset, reason=request.reason
+        )
+        return {
+            "workflow": result.workflow_name,
+            "status": result.status.value,
+            "duration_ms": result.duration_ms,
+            "error_message": result.error_message,
+        }
+    except Exception as e:
+        logger.error(f"Urgent analysis failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Urgent analysis failed: {str(e)}",
+        )
+
+
+@app.get("/api/v1/orionis/logs", tags=["Orionis Core"])
+async def get_orchestration_logs(limit: int = 20) -> Dict[str, Any]:
+    """Retrieve recent orchestration logs from Supabase."""
+    try:
+        client = await db.connect()
+        response = await (
+            client.table("orchestration_logs")
+            .select("*")
+            .order("started_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return {
+            "count": len(response.data or []),
+            "items": response.data or [],
+        }
+    except Exception as e:
+        logger.error(f"Error fetching orchestration logs: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve orchestration logs.",
+        )

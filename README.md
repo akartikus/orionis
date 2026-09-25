@@ -59,6 +59,12 @@ SCHEDULER_NEWS_INTERVAL_MINUTES=15
 
 # Assets surveillés par le market sync (optionnel, comma-separated)
 MARKET_SYNC_ASSETS=BTC,ETH,SOL
+
+# Orionis Core — workflow quotidien et seuils d'alerte (optionnel)
+DAILY_ANALYSIS_HOUR=8
+DAILY_ANALYSIS_MINUTE=0
+PRICE_DROP_THRESHOLD_PCT=8.0
+PRICE_SURGE_THRESHOLD_PCT=8.0
 ```
 
 ### Où trouver chaque valeur
@@ -107,6 +113,17 @@ orionis/
     │   ├── portfolio_collector.py  # Sync Bitvavo → table 'portfolio'
     │   ├── market_collector.py     # Snapshots de marché + indicateurs (RSI, MACD, EMA)
     │   └── news_collector.py      # Collecte RSS + analyse de sentiment
+    ├── core/                        # Orionis Core — orchestrateur central
+    │   ├── __init__.py             # Exports publics (EventBus, WorkflowEngine, OrionisCore)
+    │   ├── event_bus.py            # EventBus async (pub/sub in-process)
+    │   ├── workflow.py             # Workflow, WorkflowStep, WorkflowEngine (retry, timeout, logging)
+    │   ├── orionis_core.py        # OrionisCore (façade singleton) + instance globale
+    │   ├── interfaces.py          # Protocol stubs (IA, Portfolio, Execution — étapes 05/06/07)
+    │   └── workflows/
+    │       ├── daily_analysis.py  # collecte → analyse → validation → exécution → rapport
+    │       ├── urgent_analysis.py # analyse immédiate sur un asset (alerte prix/news)
+    │       ├── portfolio_rebalance.py  # vérification allocation → ajustements
+    │       └── data_sync.py       # lance tous les collectors en séquence
     ├── execution/
     │   └── order_executor.py     # Exécution d'ordres live Bitvavo (CCXT) + log Supabase
     ├── database/
@@ -141,17 +158,21 @@ Endpoints disponibles :
 
 | Méthode | Route | Description |
 |---|---|---|
-| `GET` | `/health` | Vérifie que l'API et le scheduler sont en ligne |
+| `GET` | `/health` | Vérifie que l'API, le scheduler et Orionis Core sont en ligne |
 | `GET` | `/api/v1/portfolio?managed_only=false` | Liste le portefeuille global Supabase |
 | `POST` | `/api/v1/trade` | Exécute un ordre au marché sur Bitvavo (origin='ORIONIS') |
 | `POST` | `/api/v1/sync/portfolio` | Sync manuelle du portefeuille depuis Bitvavo |
 | `POST` | `/api/v1/sync/market` | Sync manuelle des données de marché |
 | `POST` | `/api/v1/sync/news` | Sync manuelle des actualités crypto |
+| `POST` | `/api/v1/orionis/daily-analysis` | Déclenche le workflow d'analyse quotidien (arrière-plan) |
+| `POST` | `/api/v1/orionis/urgent-analysis` | Déclenche une analyse urgente sur un asset (`{asset, reason}`) |
+| `GET` | `/api/v1/orionis/logs` | Liste les `orchestration_logs` récents (workflows exécutés) |
 
 Jobs planifiés (APScheduler) :
 - **Portfolio** : toutes les 5 minutes
 - **Market** (BTC, ETH, SOL) : toutes les minutes
 - **News** : toutes les 15 minutes
+- **Daily analysis** (Orionis Core) : tous les jours à `DAILY_ANALYSIS_HOUR:DAILY_ANALYSIS_MINUTE` (08:00 par défaut)
 
 ### Bot Discord
 
