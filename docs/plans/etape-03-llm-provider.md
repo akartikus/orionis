@@ -69,6 +69,7 @@ class OpenRouterProvider(LLMProvider):
     #          X-Title: ORIONIS
     # Modèles disponibles: 'zai-org/glm-5', 'openai/gpt-4o',
     #   'anthropic/claude-3.5-sonnet', 'meta-llama/llama-3.1-70b'…
+    #   GLM-5 : 'z-ai/glm-5' (modèle par défaut d'ORIONIS)
 ```
 
 ### Implémentation OpenAI (alternative)
@@ -128,10 +129,12 @@ Ajouter dans `config.py` :
 
 ```python
 LLM_PROVIDER: str = "openrouter"          # 'openrouter' | 'openai' | 'local'
-LLM_DEFAULT_MODEL: str = "zai-org/glm-5"  # modèle par défaut
+LLM_DEFAULT_MODEL: str = "z-ai/glm-5"     # modèle par défaut (GLM-5)
 LLM_TEMPERATURE: float = 0.7
 LLM_MAX_TOKENS: int = 2000
 LLM_TIMEOUT_SECONDS: float = 30.0
+LLM_REASONING_ENABLED: bool = False  # raisonnement (GLM-5) — False=fiable/rapide
+LLM_REASONING_EFFORT: str | None = None  # 'low'|'high'|'max' (si activé)
 OPENAI_API_KEY: str | None = None         # si provider=openai
 OLLAMA_BASE_URL: str = "http://localhost:11434"  # si provider=local
 ```
@@ -180,22 +183,32 @@ Créer `src/scripts/test_llm.py` :
 
 ## Critères de validation
 
-- [ ] `get_llm_provider()` retourne le bon provider selon `LLM_PROVIDER`
-- [ ] `OpenRouterProvider.complete()` renvoie une réponse non vide
-- [ ] Le JSON mode fonctionne (réponse parsable en dict)
-- [ ] Les erreurs (timeout, 401, 429) sont catchées et loggées
-- [ ] `test_llm.py` s'exécute avec succès
-- [ ] `pyright` passe sans erreur
-- [ ] Le code des analystes (étape 05) n'aura **aucune** dépendance directe
+- [x] `get_llm_provider()` retourne le bon provider selon `LLM_PROVIDER`
+- [x] `OpenRouterProvider.complete()` renvoie une réponse non vide
+- [x] Le JSON mode fonctionne (réponse parsable en dict)
+- [x] Les erreurs (timeout, 401, 429) sont catchées et loggées
+- [x] `test_llm.py` s'exécute avec succès (exit 0, modèle `z-ai/glm-5`)
+- [x] `pyright` passe sans erreur (sur `src/ai/`)
+- [x] Le code des analystes (étape 05) n'aura **aucune** dépendance directe
       vers OpenRouter — uniquement vers `LLMProvider`
 
 ---
 
 ## Notes
 
-- OpenRouter facture au token ; logger les coûts pour suivi.
+- OpenRouter facture au token ; le coût est logué à chaque appel
+  (`cost=$0.00xxxx` dans les logs OpenRouterProvider).
 - Prévoir un **fallback** : si le modèle primaire (GLM-5) est indisponible,
   fallback automatique vers un modèle secondaire (ex: `openai/gpt-4o-mini`).
 - Le `response_format` JSON mode n'est pas supporté par tous les modèles ;
   prévoir un retry sans JSON mode + parsing manuel si échec.
 - Ne **jamais** envoyer de secrets ou clés API dans les prompts.
+- **GLM-5 est un modèle de raisonnement** (`reasoning.mandatory: false` sur
+  OpenRouter) : par défaut le raisonnement consomme une part importante du
+  budget de tokens et peut laisser le `content` final vide. C'est pourquoi
+  `LLM_REASONING_ENABLED=False` par défaut (sorties fiables, rapides et
+  économiques). Mettre à `true` (+ `LLM_REASONING_EFFORT=low|high|max`)
+  pour les analyses complexes nécessitant du raisonnement.
+- L'identifiant OpenRouter réel du modèle GLM-5 est **`z-ai/glm-5`**
+  (préfixe `z-ai/`, et non `zai-org/`).
+

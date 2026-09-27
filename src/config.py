@@ -20,6 +20,18 @@ class Settings(BaseSettings):
 
     # LLM
     OPENROUTER_API: str | None = None
+    LLM_PROVIDER: str = "openrouter"  # 'openrouter' | 'openai' | 'local'
+    LLM_DEFAULT_MODEL: str = "z-ai/glm-5"  # modèle par défaut (GLM-5 via OpenRouter)
+    LLM_TEMPERATURE: float = 0.7
+    LLM_MAX_TOKENS: int = 2000
+    LLM_TIMEOUT_SECONDS: float = 30.0
+    OPENAI_API_KEY: str | None = None  # requis si LLM_PROVIDER=openai
+    OLLAMA_BASE_URL: str = "http://localhost:11434"  # requis si LLM_PROVIDER=local
+    # Raisonnement (modèles reasoning comme GLM-5). False = sorties fiables,
+    # rapides et économiques (recommandé pour un bot de trading) ; True active
+    # le raisonnement pour les analyses complexes (coûte plus de tokens).
+    LLM_REASONING_ENABLED: bool = False
+    LLM_REASONING_EFFORT: str | None = None  # 'low' | 'high' | 'max' (si activé)
 
     FASTAPI_BASE_URL: str = "http://127.0.0.1:8000"
 

@@ -51,6 +51,21 @@ DISCORD_GUILD_ID=identifiant_du_serveur_discord
 
 # LLM (optionnel)
 OPENROUTER_API=votre_cle_openrouter
+# Provider IA — 'openrouter' (défaut) | 'openai' | 'local' (Ollama)
+LLM_PROVIDER=openrouter
+# Modèle par défaut (GLM-5 via OpenRouter)
+LLM_DEFAULT_MODEL=z-ai/glm-5
+LLM_TEMPERATURE=0.7
+LLM_MAX_TOKENS=2000
+LLM_TIMEOUT_SECONDS=30.0
+# Raisonnement (modèles reasoning comme GLM-5). False = sorties fiables/rapides
+# (recommandé) ; True = raisonnement activé pour analyses complexes (+coûteux)
+LLM_REASONING_ENABLED=false
+LLM_REASONING_EFFORT=
+# Requis uniquement si LLM_PROVIDER=openai
+OPENAI_API_KEY=
+# Requis uniquement si LLM_PROVIDER=local
+OLLAMA_BASE_URL=http://localhost:11434
 
 # Scheduler — intervalles en minutes (optionnel, valeurs par défaut indiquées)
 SCHEDULER_PORTFOLIO_INTERVAL_MINUTES=5
@@ -113,6 +128,18 @@ orionis/
     │   ├── portfolio_collector.py  # Sync Bitvavo → table 'portfolio'
     │   ├── market_collector.py     # Snapshots de marché + indicateurs (RSI, MACD, EMA)
     │   └── news_collector.py      # Collecte RSS + analyse de sentiment
+    ├── ai/                         # Couche IA — abstraction LLM interchangeable
+    │   ├── __init__.py
+    │   ├── llm/
+    │   │   ├── __init__.py
+    │   │   ├── base.py             # LLMMessage, LLMResponse, LLMProvider (Protocol)
+    │   │   ├── openrouter.py       # OpenRouterProvider (GLM-5 par défaut + fallback)
+    │   │   ├── openai_provider.py  # OpenAIProvider (alternative)
+    │   │   ├── local.py            # LocalOllamaProvider (modèles locaux)
+    │   │   └── factory.py          # get_llm_provider() (selon LLM_PROVIDER)
+    │   └── prompts/
+    │       ├── __init__.py
+    │       └── system.py           # Persona système d'Orionis
     ├── core/                        # Orionis Core — orchestrateur central
     │   ├── __init__.py             # Exports publics (EventBus, WorkflowEngine, OrionisCore)
     │   ├── event_bus.py            # EventBus async (pub/sub in-process)
@@ -141,7 +168,8 @@ orionis/
     │       └── 009_add_orchestration_logs_table.sql
     └── scripts/
         ├── run_bot.py            # Point d'entrée du bot Discord
-        └── test_market_sync.py   # Test du MarketCollector
+        ├── test_market_sync.py   # Test du MarketCollector
+        └── test_llm.py            # Test du provider LLM (GLM-5 par défaut)
 ```
 
 ## Lancement
@@ -196,6 +224,7 @@ Commandes slash disponibles dans Discord :
 ```bash
 .venv/bin/python src/main.py          # Test tous les collectors en séquence
 .venv/bin/python src/scripts/test_market_sync.py   # Test du MarketCollector uniquement
+.venv/bin/python src/scripts/test_llm.py           # Test du provider LLM (GLM par défaut)
 ```
 
 ## Notes
